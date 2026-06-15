@@ -1,0 +1,6 @@
+{
+  "name": "Trader Academic",
+  "description": "Uma plataforma moderna de LMS para mentoria de trading com estilo visual de alta densidade estilo Netflix, controle de progresso e painel administrativo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

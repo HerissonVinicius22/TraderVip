@@ -1,0 +1,95 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;550;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  /* Extracted theme colors from High Density Design HTML */
+  --color-gold: #D4AF37;
+  --color-brand-red: #E50914;
+  --color-bg-dark: #050505;
+  --color-bg-card: #141414;
+  --color-bg-panel: #000000;
+
+  /* Remap all amber shades used in the existing code to the premium gold of Mentoria Pro */
+  --color-amber-100: #F6EFCB;
+  --color-amber-200: #EEDD92;
+  --color-amber-300: #E5CA59;
+  --color-amber-400: #E2BF4D;
+  --color-amber-500: #D4AF37;
+  --color-amber-600: #C09B25;
+  --color-amber-700: #A28221;
+}
+
+/* global overrides to ensure high density style */
+body, html {
+  background-color: #050505 !important;
+  color: #ffffff;
+}
+
+/* Smooth ambient light scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+::-webkit-scrollbar-thumb {
+  background: #222;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #D4AF37;
+}
+
+/* High density layouts overrides */
+.bg-zinc-950, .bg-neutral-950, .bg-black {
+  background-color: #050505 !important;
+}
+
+.bg-zinc-900 {
+  background-color: #141414 !important;
+}
+
+.bg-black\/95, .bg-black\/90, .bg-neutral-950\/60, .bg-black\/80 {
+  background-color: rgba(5, 5, 5, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* Crisp 1px thin borders from custom HTML */
+.border-zinc-800, .border-zinc-805, .border-zinc-900, .border-zinc-850 {
+  border-color: #222222 !important;
+}
+
+.border-zinc-700 {
+  border-color: #333333 !important;
+}
+
+/* Custom layout patterns from Design HTML */
+.hero-section {
+  background: linear-gradient(90deg, #000000 30%, transparent 100%), 
+              radial-gradient(circle at 70% 30%, #D4AF37 0%, transparent 40%) !important;
+}
+
+.stat-pill {
+  background: #1a1a1a;
+  border: 1px solid #333;
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 12px;
+  color: #D4AF37;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
