@@ -32,25 +32,32 @@ function asyncWrapper(fn) {
 
 
 /**
- * Seed data – will be migrated by migrateData.ts on first run.
+ * Seed data – read from database.json and migrated by migrateData.ts on first run.
  */
-export const DEFAULT_DB = {
-  users_profiles: [],
-  modules: [],
-  lessons: [],
-  lesson_progress: [],
-  terms_acceptance: [],
-  vip_offers: {
-    monthly_title: "Plano Mensal Premium",
-    monthly_price: "97,00",
-    monthly_installment_value: "9,70",
-    monthly_checkout_url: "https://kiwify.com.br",
-    lifetime_title: "Acesso Vitalício Black",
-    lifetime_price: "497,00",
-    lifetime_installment_value: "49,70",
-    lifetime_checkout_url: "https://kiwify.com.br"
-  }
-};
+let dbContent;
+try {
+  dbContent = JSON.parse(fs.readFileSync(path.join(process.cwd(), "database.json"), "utf8"));
+} catch (e) {
+  console.warn("Could not read database.json, using fallback.");
+  dbContent = {
+    users_profiles: [],
+    modules: [],
+    lessons: [],
+    lesson_progress: [],
+    terms_acceptance: [],
+    vip_offers: {
+      monthly_title: "Plano Mensal Premium",
+      monthly_price: "97,00",
+      monthly_installment_value: "9,70",
+      monthly_checkout_url: "https://kiwify.com.br",
+      lifetime_title: "Acesso Vitalício Black",
+      lifetime_price: "497,00",
+      lifetime_installment_value: "49,70",
+      lifetime_checkout_url: "https://kiwify.com.br"
+    }
+  };
+}
+export const DEFAULT_DB = dbContent;
 
 // ---------- AUTH ----------
 app.post("/api/auth/register", asyncWrapper(async (req, res) => {
@@ -255,4 +262,7 @@ app.get("*", (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+import { fileURLToPath } from 'url';
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+}

@@ -1,14 +1,16 @@
 // migrateData.ts - Executes once on server start to ensure seed data exists in Supabase
 import { supabase } from "./supabaseClient";
-import { upsertTable, countRows } from "./supabaseHelpers";
+import { upsertTable, countRows, insertRows } from "./supabaseHelpers";
 import { DEFAULT_DB } from "./server"; // Exported from server.ts
 
 export async function migrateIfNeeded() {
   // Helper to insert rows if table is empty
   async function ensure<T>(table: string, rows: T[]) {
+    console.log(`Checking table: ${table}`);
     const existing = await countRows(table);
+    console.log(`Table ${table} has ${existing} rows`);
     if (existing === 0 && rows.length) {
-      await upsertTable<T>(table, rows);
+      await insertRows<T>(table, rows);
       console.log(`[Migration] Inserted ${rows.length} rows into ${table}`);
     }
   }
@@ -23,13 +25,14 @@ export async function migrateIfNeeded() {
     // Supabase does not have a dedicated table for a single object; store as a singleton row
     const count = await countRows("vip_offers");
     if (count === 0) {
-      await upsertTable("vip_offers", [DEFAULT_DB.vip_offers] as any);
+      await insertRows("vip_offers", [DEFAULT_DB.vip_offers] as any);
       console.log(`[Migration] Inserted vip_offers`);
     }
   }
 }
 
-// Run migration immediately when this module is imported (used in package.json dev script)
-if (require.main === module) {
-  migrateIfNeeded().catch((e) => console.error("[Migration error]", e));
+// Run migration immediately when this module is imported directly
+import { fileURLToPath } from 'url';
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  migrateIfNeeded().catch((e: any) => console.error("[Migration error]", e.stack || e));
 }

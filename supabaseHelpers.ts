@@ -28,3 +28,13 @@ export async function upsertTable<T>(table: string, rows: T[]): Promise<void> {
   await deleteAllRows(table);
   await insertRows<T>(table, rows);
 }
+
+/** Count rows in a table. */
+export async function countRows(table: string): Promise<number> {
+  const { count, error, status, statusText } = await supabase.from(table).select('*', { count: 'exact', head: true });
+  if (error) {
+    console.error('Supabase error:', error, 'Status:', status, statusText);
+    throw error;
+  }
+  return count ?? 0;
+}
