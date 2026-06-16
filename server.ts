@@ -11,8 +11,12 @@ const PORT = 3000;
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
 
 // Ensure uploads directory exists
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+try {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+} catch (e) {
+  console.warn("Could not create uploads directory (expected in Vercel/Serverless environments).");
 }
 
 app.use(express.json({ limit: "50mb" })); // High limit for Base64 uploads
@@ -266,3 +270,5 @@ import { fileURLToPath } from 'url';
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 }
+
+export default app;
