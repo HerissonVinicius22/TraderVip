@@ -38,3 +38,16 @@ export async function countRows(table: string): Promise<number> {
   }
   return count ?? 0;
 }
+
+/** Delete a single row by ID. */
+export async function deleteRow(table: string, id: string): Promise<void> {
+  const { error } = await (supabase as any).from(table).delete().eq('id', id);
+  if (error) throw error;
+}
+
+/** Delete rows matching a specific column value. */
+export async function deleteRowsMatching(table: string, column: string, value: any): Promise<void> {
+  const { error } = await (supabase as any).from(table).delete().eq(column, value);
+  if (error) throw error;
+}
+

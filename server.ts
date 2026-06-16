@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
-import { selectRows, insertRows, upsertTable } from "./supabaseHelpers.js";
+import { selectRows, insertRows, upsertTable, deleteRow, deleteRowsMatching } from "./supabaseHelpers.js";
 
 dotenv.config();
 
@@ -219,6 +219,173 @@ app.post("/api/admin/users/:id/toggle-block", asyncWrapper(async (req, res) => {
   target.is_blocked = !target.is_blocked;
   await upsertTable("users_profiles", [target]);
   res.json({ success: true, user: target });
+}));
+
+app.get("/api/admin/stats", asyncWrapper(async (req, res) => {
+  const adminId = req.query.adminId as string;
+  const admins = await selectRows<any>("users_profiles");
+  const admin = admins.find(u => u.id === adminId && u.role === "admin");
+  if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
+
+  const [users, lessons, progress] = await Promise.all([
+    selectRows<any>("users_profiles"),
+    selectRows<any>("lessons"),
+    selectRows<any>("lesson_progress")
+  ]);
+
+  const students = users.filter(u => u.role === "student");
+  const totalStudents = students.length;
+  const activeStudents = students.filter(u => !u.is_blocked).length;
+
+  const totalLessons = lessons.length;
+  let averageProgress = 0;
+  if (totalStudents > 0 && totalLessons > 0) {
+    let sumProgress = 0;
+    students.forEach(student => {
+      const completedCount = progress.filter(p => p.user_id === student.id && p.completed).length;
+      const progressPercent = (completedCount / totalLessons) * 100;
+      sumProgress += Math.min(progressPercent, 100);
+    });
+    averageProgress = Math.round(sumProgress / totalStudents);
+  }
+
+  res.json({
+    totalStudents,
+    activeStudents,
+    averageProgress
+  });
+}));
+
+app.get("/api/vip-offers", asyncWrapper(async (req, res) => {
+  const rows = await selectRows<any>("vip_offers");
+  res.json({ success: true, offers: rows[0] });
+}));
+
+app.post("/api/admin/vip-offers", asyncWrapper(async (req, res) => {
+  const { adminId, vip_offers } = req.body;
+  const admins = await selectRows<any>("users_profiles");
+  const admin = admins.find(u => u.id === adminId && u.role === "admin");
+  if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
+
+  await upsertTable("vip_offers", [vip_offers]);
+  res.json({ success: true });
+}));
+
+app.post("/api/admin/users/:id/update", asyncWrapper(async (req, res) => {
+  const { adminId, updateData } = req.body;
+  const targetUserId = req.params.id;
+  const admins = await selectRows<any>("users_profiles");
+  const admin = admins.find(u => u.id === adminId && u.role === "admin");
+  if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
+
+  const users = await selectRows<any>("users_profiles");
+  const target = users.find(u => u.id === targetUserId);
+  if (!target) return res.status(404).json({ error: "Usuário não encontrado." });
+
+  Object.assign(target, updateData);
+  await upsertTable("users_profiles", [target]);
+  res.json({ success: true, user: target });
+}));
+
+app.post("/api/admin/users/:id/reset-password", asyncWrapper(async (req, res) => {
+  const { adminId, newPassword } = req.body;
+  const targetUserId = req.params.id;
+  const admins = await selectRows<any>("users_profiles");
+  const admin = admins.find(u => u.id === adminId && u.role === "admin");
+  if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
+
+  const users = await selectRows<any>("users_profiles");
+  const target = users.find(u => u.id === targetUserId);
+  if (!target) return res.status(404).json({ error: "Usuário não encontrado." });
+
+  target.passwordHash = newPassword;
+  await upsertTable("users_profiles", [target]);
+  res.json({ success: true });
+}));
+
+app.post("/api/admin/modules", asyncWrapper(async (req, res) => {
+  const { adminId, title, description, cover_image_url, is_vip } = req.body;
+  const admins = await selectRows<any>("users_profiles");
+  const admin = admins.find(u => u.id === adminId && u.role === "admin");
+  if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
+
+  const modules = await selectRows<any>("modules");
+  const nextOrder = modules.length > 0 ? Math.max(...modules.map(m => m.order_index)) + 1 : 1;
+  const newModule = {
+    id: "mod_" + Math.random().toString(36).substring(2, 11),
+    title,
+    description,
+    cover_image_url,
+    order_index: nextOrder,
+    is_vip: !!is_vip
+  };
+  await insertRows("modules", [newModule]);
+  res.json({ success: true, module: newModule });
+}));
+
+app.put("/api/admin/modules/:id", asyncWrapper(async (req, res) => {
+  const { adminId, title, description, cover_image_url, is_vip } = req.body;
+  const moduleId = req.params.id;
+  const admins = await selectRows<any>("users_profiles");
+  const admin = admins.find(u => u.id === adminId && u.role === "admin");
+  if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
+
+  const modules = await selectRows<any>("modules");
+  const mod = modules.find(m => m.id === moduleId);
+  if (!mod) return res.status(404).json({ error: "Módulo não encontrado." });
+
+  mod.title = title;
+  mod.description = description;
+  mod.cover_image_url = cover_image_url;
+  mod.is_vip = !!is_vip;
+
+  await upsertTable("modules", [mod]);
+  res.json({ success: true, module: mod });
+}));
+
+app.post("/api/admin/lessons", asyncWrapper(async (req, res) => {
+  const { adminId, module_id, title, youtube_url, duration } = req.body;
+  const admins = await selectRows<any>("users_profiles");
+  const admin = admins.find(u => u.id === adminId && u.role === "admin");
+  if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
+
+  const lessons = await selectRows<any>("lessons");
+  const modLessons = lessons.filter(l => l.module_id === module_id);
+  const nextOrder = modLessons.length > 0 ? Math.max(...modLessons.map(l => l.order_index)) + 1 : 1;
+
+  const newLesson = {
+    id: "les_" + Math.random().toString(36).substring(2, 11),
+    module_id,
+    title,
+    youtube_url,
+    duration,
+    order_index: nextOrder
+  };
+  await insertRows("lessons", [newLesson]);
+  res.json({ success: true, lesson: newLesson });
+}));
+
+app.delete("/api/admin/modules/:id", asyncWrapper(async (req, res) => {
+  const adminId = req.query.adminId as string;
+  const moduleId = req.params.id;
+  const admins = await selectRows<any>("users_profiles");
+  const admin = admins.find(u => u.id === adminId && u.role === "admin");
+  if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
+
+  await deleteRowsMatching("lessons", "module_id", moduleId);
+  await deleteRow("modules", moduleId);
+  res.json({ success: true });
+}));
+
+app.delete("/api/admin/lessons/:id", asyncWrapper(async (req, res) => {
+  const adminId = req.query.adminId as string;
+  const lessonId = req.params.id;
+  const admins = await selectRows<any>("users_profiles");
+  const admin = admins.find(u => u.id === adminId && u.role === "admin");
+  if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
+
+  await deleteRow("lessons", lessonId);
+  res.json({ success: true });
 }));
 
 // ---------- IMAGE UPLOAD (kept local) ----------
