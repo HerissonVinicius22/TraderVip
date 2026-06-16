@@ -5,21 +5,21 @@ import { supabase } from './supabaseClient.js';
  * Returns an array of records or throws on error.
  */
 export async function selectRows<T>(table: string): Promise<T[]> {
-  const { data, error } = await supabase.from<T>(table).select('*');
+  const { data, error } = await (supabase as any).from(table).select('*');
   if (error) throw error;
-  return data ?? [];
+  return (data as T[]) ?? [];
 }
 
 /** Insert multiple rows into a table. */
 export async function insertRows<T>(table: string, rows: T[]): Promise<void> {
   if (rows.length === 0) return;
-  const { error } = await supabase.from<T>(table).insert(rows);
+  const { error } = await (supabase as any).from(table).insert(rows as any);
   if (error) throw error;
 }
 
 /** Delete all rows from a table. */
 export async function deleteAllRows(table: string): Promise<void> {
-  const { error } = await supabase.from(table).delete().neq('id', '___'); // delete where id not dummy
+  const { error } = await (supabase as any).from(table).delete().neq('id', '___'); // delete where id not dummy
   if (error) throw error;
 }
 
@@ -31,7 +31,7 @@ export async function upsertTable<T>(table: string, rows: T[]): Promise<void> {
 
 /** Count rows in a table. */
 export async function countRows(table: string): Promise<number> {
-  const { count, error, status, statusText } = await supabase.from(table).select('*', { count: 'exact', head: true });
+  const { count, error, status, statusText } = await (supabase as any).from(table).select('*', { count: 'exact', head: true });
   if (error) {
     console.error('Supabase error:', error, 'Status:', status, statusText);
     throw error;

@@ -244,9 +244,9 @@ app.post("/api/admin/upload-cover", asyncWrapper(async (req, res) => {
   }
 }));
 
-// ---------- START SERVER ----------
+// Start server
 app.get("/goal", (req, res) => {
-  const indexPath = path.join(process.cwd(), "index.html");
+  const indexPath = path.join(process.cwd(), "dist", "index.html");
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
   } else {
@@ -257,7 +257,7 @@ app.use(express.static(path.join(process.cwd(), "dist")));
 
 // Fallback to index.html for SPA routes
 app.get("*", (req, res) => {
-  const indexPath = path.join(process.cwd(), "index.html");
+  const indexPath = path.join(process.cwd(), "dist", "index.html");
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
   } else {
