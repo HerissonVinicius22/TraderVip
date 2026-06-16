@@ -1,8 +1,11 @@
 {
-  "cleanUrls": true,
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/uploads/(.*)", "destination": "/api" },
-    { "source": "/((?!api|uploads).*)", "destination": "/index.html" }
+  "version": 2,
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.ts" },
+    { "src": "/uploads/(.*)", "dest": "/api/index.ts" },
+    { "src": "/assets/(.*)", "dest": "/assets/$1" },
+    { "src": "/favicon.ico", "dest": "/favicon.ico" },
+    { "src": "/favicon.png", "dest": "/favicon.png" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
