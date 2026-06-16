@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase } from './supabaseClient.js';
 
 /**
  * Generic helper to select rows from a Supabase table.

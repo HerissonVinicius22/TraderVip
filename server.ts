@@ -2,7 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
-import { selectRows, insertRows, upsertTable } from "./supabaseHelpers";
+import { selectRows, insertRows, upsertTable } from "./supabaseHelpers.js";
 
 dotenv.config();
 

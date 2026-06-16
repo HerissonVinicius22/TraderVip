@@ -1,7 +1,7 @@
 // migrateData.ts - Executes once on server start to ensure seed data exists in Supabase
-import { supabase } from "./supabaseClient";
-import { upsertTable, countRows, insertRows } from "./supabaseHelpers";
-import { DEFAULT_DB } from "./server"; // Exported from server.ts
+import { supabase } from "./supabaseClient.js";
+import { upsertTable, countRows, insertRows } from "./supabaseHelpers.js";
+import { DEFAULT_DB } from "./server.js"; // Exported from server.ts
 
 export async function migrateIfNeeded() {
   // Helper to insert rows if table is empty
