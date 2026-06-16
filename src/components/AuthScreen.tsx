@@ -259,21 +259,7 @@ export default function AuthScreen({ onAuthSuccess, onBackToLanding, initialMode
             </button>
           </form>
 
-          {/* Quick Demo Credentials Reminder */}
-          <div className="mt-8 pt-4 border-t border-zinc-800/60 text-center">
-            <span className="text-[10px] uppercase font-bold text-zinc-500 tracking-wider">Acesso de Demonstração Rápido</span>
-            <div className="flex justify-center gap-4 mt-2 text-[11px] text-zinc-400">
-              <div>
-                <span className="font-bold text-amber-500/95 block">Conta de Aluno:</span>
-                <code>aluno@trading.com</code> <span className="text-zinc-600 block">senha:</span> <code className="text-amber-500 font-bold">aluno123</code>
-              </div>
-              <div className="border-l border-zinc-800"></div>
-              <div>
-                <span className="font-bold text-amber-500/95 block">Conta de Admin:</span>
-                <code>admin@trading.com</code> <span className="text-zinc-600 block">senha:</span> <code className="text-amber-500 font-bold">admin123</code>
-              </div>
-            </div>
-          </div>
+
 
         </div>
       </main>
