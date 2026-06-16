@@ -1,9 +1,8 @@
 {
-  "version": 2,
-  "builds": [
-    { "src": "server.ts", "use": "@vercel/node" }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "/server.ts" }
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/uploads/(.*)", "destination": "/api" },
+    { "source": "/((?!api|uploads).*)", "destination": "/index.html" }
   ]
 }
