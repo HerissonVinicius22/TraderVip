@@ -1,33 +1,62 @@
 // migrateData.ts - Executes once on server start to ensure seed data exists in Supabase
 import { supabase } from "./supabaseClient.js";
-import { upsertTable, countRows, insertRows } from "./supabaseHelpers.js";
+import { upsertTable, countRows, insertRows, selectRows } from "./supabaseHelpers.js";
 import { DEFAULT_DB } from "./server.js"; // Exported from server.ts
 
 export async function migrateIfNeeded() {
-  // Helper to insert rows if table is empty
-  async function ensure<T>(table: string, rows: T[]) {
-    console.log(`Checking table: ${table}`);
-    const existing = await countRows(table);
-    console.log(`Table ${table} has ${existing} rows`);
-    if (existing === 0 && rows.length) {
-      await insertRows<T>(table, rows);
-      console.log(`[Migration] Inserted ${rows.length} rows into ${table}`);
+  console.log("[Migration] Running seed checks...");
+
+  // 1. Ensure users exist by checking IDs
+  try {
+    const currentUsers = await selectRows<any>("users_profiles");
+    const missingUsers = (DEFAULT_DB.users_profiles as any[]).filter(
+      du => !currentUsers.some(cu => cu.id === du.id)
+    );
+    if (missingUsers.length > 0) {
+      await insertRows("users_profiles", missingUsers);
+      console.log(`[Migration] Seeded ${missingUsers.length} missing users.`);
     }
+  } catch (err) {
+    console.error("[Migration] Error seeding users:", err);
   }
 
-  // Ensure each table has seed data
-  await ensure("users_profiles", DEFAULT_DB.users_profiles as any);
-  await ensure("modules", DEFAULT_DB.modules as any);
-  await ensure("lessons", DEFAULT_DB.lessons as any);
-  await ensure("lesson_progress", DEFAULT_DB.lesson_progress as any);
-  await ensure("terms_acceptance", DEFAULT_DB.terms_acceptance as any);
-  if (DEFAULT_DB.vip_offers) {
-    // Supabase does not have a dedicated table for a single object; store as a singleton row
-    const count = await countRows("vip_offers");
-    if (count === 0) {
-      await insertRows("vip_offers", [DEFAULT_DB.vip_offers] as any);
-      console.log(`[Migration] Inserted vip_offers`);
+  // 2. Ensure modules exist by checking IDs
+  try {
+    const currentModules = await selectRows<any>("modules");
+    const missingModules = (DEFAULT_DB.modules as any[]).filter(
+      dm => !currentModules.some(cm => cm.id === dm.id)
+    );
+    if (missingModules.length > 0) {
+      await insertRows("modules", missingModules);
+      console.log(`[Migration] Seeded ${missingModules.length} missing modules.`);
     }
+  } catch (err) {
+    console.error("[Migration] Error seeding modules:", err);
+  }
+
+  // 3. Ensure lessons exist by checking IDs
+  try {
+    const currentLessons = await selectRows<any>("lessons");
+    const missingLessons = (DEFAULT_DB.lessons as any[]).filter(
+      dl => !currentLessons.some(cl => cl.id === dl.id)
+    );
+    if (missingLessons.length > 0) {
+      await insertRows("lessons", missingLessons);
+      console.log(`[Migration] Seeded ${missingLessons.length} missing lessons.`);
+    }
+  } catch (err) {
+    console.error("[Migration] Error seeding lessons:", err);
+  }
+
+  // 4. Ensure vip_offers config exists
+  try {
+    const count = await countRows("vip_offers");
+    if (count === 0 && DEFAULT_DB.vip_offers) {
+      await insertRows("vip_offers", [DEFAULT_DB.vip_offers] as any);
+      console.log(`[Migration] Seeded vip_offers.`);
+    }
+  } catch (err) {
+    console.error("[Migration] Error seeding vip_offers:", err);
   }
 }
 

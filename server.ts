@@ -4,6 +4,7 @@ import fs from "fs";
 import dotenv from "dotenv";
 import multer from "multer";
 import { selectRows, insertRows, upsertTable, deleteRow, deleteRowsMatching } from "./supabaseHelpers.js";
+import { migrateIfNeeded } from "./migrateData.js";
 
 dotenv.config();
 
@@ -573,6 +574,7 @@ app.get("*", (req, res) => {
 // Start server
 import { fileURLToPath } from 'url';
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  migrateIfNeeded().catch(err => console.error("Migration failed:", err));
   app.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
 }
 
