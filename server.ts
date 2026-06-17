@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
+import multer from "multer";
 import { selectRows, insertRows, upsertTable, deleteRow, deleteRowsMatching } from "./supabaseHelpers.js";
 
 dotenv.config();
@@ -9,6 +10,16 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: (req, file, cb) => {
+    const uniqueFileName = `${Date.now()}_${file.originalname.replace(/\s+/g, "_")}`;
+    cb(null, uniqueFileName);
+  }
+});
+const upload = multer({ storage });
 
 // Ensure uploads directory exists
 try {
@@ -21,6 +32,25 @@ try {
 
 app.use(express.json({ limit: "50mb" })); // High limit for Base64 uploads
 app.use("/uploads", express.static(UPLOADS_DIR));
+
+// User Activities In-Memory Persistence with JSON file backup
+const ACTIVITY_FILE = path.join(process.cwd(), "user_activity.json");
+let userActivities: Record<string, { favorites: string[], recents: string[] }> = {};
+try {
+  if (fs.existsSync(ACTIVITY_FILE)) {
+    userActivities = JSON.parse(fs.readFileSync(ACTIVITY_FILE, "utf8"));
+  }
+} catch (e) {
+  console.warn("Could not read user_activity.json");
+}
+
+function saveActivities() {
+  try {
+    fs.writeFileSync(ACTIVITY_FILE, JSON.stringify(userActivities, null, 2), "utf8");
+  } catch (e) {
+    console.warn("Could not save user_activity.json");
+  }
+}
 
 // Simple logger
 process.on('unhandledRejection', (reason, promise) => {
@@ -388,29 +418,137 @@ app.delete("/api/admin/lessons/:id", asyncWrapper(async (req, res) => {
   res.json({ success: true });
 }));
 
-// ---------- IMAGE UPLOAD (kept local) ----------
-app.post("/api/admin/upload-cover", asyncWrapper(async (req, res) => {
-  const { adminId, fileName, base64Data } = req.body;
-  const admins = await selectRows<any>("users_profiles");
-  const admin = admins.find(u => u.id === adminId && u.role === "admin");
+app.post("/api/admin/upload-cover", upload.single('file'), asyncWrapper(async (req, res) => {
+  const adminId = req.body.adminId || req.query.adminId;
+  const admin = (await selectRows<any>("users_profiles")).find(u => u.id === adminId && u.role === "admin");
   if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
+
+  if (req.file) {
+    const publicUrl = `/uploads/${req.file.filename}`;
+    return res.json({ success: true, url: publicUrl });
+  }
+
+  const { fileName, base64Data } = req.body;
   if (!fileName || !base64Data) {
-    return res.status(400).json({ error: "Arquivo ou dados corrompidos." });
+    return res.status(400).json({ error: "Nenhum arquivo ou dados base64 enviados." });
   }
-  try {
-    const base64Clean = base64Data.replace(/^data:image\/\w+;base64,/, "");
-    const buffer = Buffer.from(base64Clean, "base64");
-    const uniqueFileName = `${Date.now()}_${fileName.replace(/\s+/g, "_")}`;
-    const filePath = path.join(UPLOADS_DIR, uniqueFileName);
-    fs.writeFileSync(filePath, buffer);
-    const publicUrl = `/uploads/${uniqueFileName}`;
-    res.json({ success: true, url: publicUrl });
-  } catch (error) {
-    console.error("Erro salvando imagem:", error);
-    res.status(500).json({ error: "Erro de servidor ao processar o upload do arquivo." });
-  }
+
+  const clean = base64Data.replace(/^data:image\/\w+;base64,/, "");
+  const buffer = Buffer.from(clean, "base64");
+  const unique = `${Date.now()}_${fileName.replace(/\s+/g, "_")}`;
+  const dest = path.join(UPLOADS_DIR, unique);
+  fs.writeFileSync(dest, buffer);
+  return res.json({ success: true, url: `/uploads/${unique}` });
 }));
 
+// ---------- USER PROFILE & ACTIVITY ----------
+app.get("/api/users/me", asyncWrapper(async (req, res) => {
+  const userId = req.query.userId as string;
+  if (!userId) {
+    return res.status(400).json({ error: "userId é obrigatório." });
+  }
+  const users = await selectRows<any>("users_profiles");
+  const user = users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(404).json({ error: "Usuário não encontrado." });
+  }
+  const { passwordHash, ...safeProfile } = user;
+  res.json({ success: true, user: safeProfile });
+}));
+
+app.post("/api/users/update-profile", asyncWrapper(async (req, res) => {
+  const { userId, name, phone, email, is_vip } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: "userId é obrigatório." });
+  }
+  const users = await selectRows<any>("users_profiles");
+  const user = users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(404).json({ error: "Usuário não encontrado." });
+  }
+
+  if (name !== undefined) user.name = name;
+  if (phone !== undefined) user.phone = phone;
+  if (email !== undefined) user.email = email;
+  if (is_vip !== undefined) user.is_vip = !!is_vip;
+
+  await upsertTable("users_profiles", [user]);
+  const { passwordHash, ...safeProfile } = user;
+  res.json({ success: true, user: safeProfile });
+}));
+
+app.get("/api/users/:id/activity", asyncWrapper(async (req, res) => {
+  const userId = req.params.id;
+  if (!userActivities[userId]) {
+    userActivities[userId] = { favorites: [], recents: [] };
+  }
+  res.json(userActivities[userId]);
+}));
+
+app.post("/api/users/toggle-favorite", asyncWrapper(async (req, res) => {
+  const { userId, lessonId } = req.body;
+  if (!userId || !lessonId) {
+    return res.status(400).json({ error: "userId e lessonId são obrigatórios." });
+  }
+  if (!userActivities[userId]) {
+    userActivities[userId] = { favorites: [], recents: [] };
+  }
+  const favs = userActivities[userId].favorites;
+  const index = favs.indexOf(lessonId);
+  if (index > -1) {
+    favs.splice(index, 1);
+  } else {
+    favs.push(lessonId);
+  }
+  saveActivities();
+  res.json({ success: true, favorites: favs });
+}));
+
+app.post("/api/users/add-recent", asyncWrapper(async (req, res) => {
+  const { userId, lessonId } = req.body;
+  if (!userId || !lessonId) {
+    return res.status(400).json({ error: "userId e lessonId são obrigatórios." });
+  }
+  if (!userActivities[userId]) {
+    userActivities[userId] = { favorites: [], recents: [] };
+  }
+  const recs = userActivities[userId].recents;
+  const index = recs.indexOf(lessonId);
+  if (index > -1) {
+    recs.splice(index, 1);
+  }
+  recs.push(lessonId);
+  if (recs.length > 10) {
+    recs.shift();
+  }
+  saveActivities();
+  res.json({ success: true, recents: recs });
+}));
+
+app.post("/api/users/upload-avatar", asyncWrapper(async (req, res) => {
+  const { userId, fileName, base64Data } = req.body;
+  if (!userId || !fileName || !base64Data) {
+    return res.status(400).json({ error: "userId, fileName e base64Data são obrigatórios." });
+  }
+
+  const users = await selectRows<any>("users_profiles");
+  const user = users.find(u => u.id === userId);
+  if (!user) {
+    return res.status(404).json({ error: "Usuário não encontrado." });
+  }
+
+  const clean = base64Data.replace(/^data:image\/\w+;base64,/, "");
+  const buffer = Buffer.from(clean, "base64");
+  const unique = `avatar_${Date.now()}_${fileName.replace(/\s+/g, "_")}`;
+  const dest = path.join(UPLOADS_DIR, unique);
+  fs.writeFileSync(dest, buffer);
+
+  const publicUrl = `/uploads/${unique}`;
+  user.avatar_url = publicUrl;
+  await upsertTable("users_profiles", [user]);
+
+  res.json({ success: true, url: publicUrl });
+}));
 // Start server
 app.get("/goal", (req, res) => {
   const indexPath = path.join(process.cwd(), "dist", "index.html");
