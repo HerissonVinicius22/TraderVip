@@ -3,23 +3,16 @@ import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
 import multer from "multer";
-import { selectRows, insertRows, upsertTable, deleteRow, deleteRowsMatching } from "./supabaseHelpers.js";
+import { selectRows, insertRows, upsertTable, updateRowById, deleteRow, deleteRowsMatching } from "./supabaseHelpers.js";
 import { migrateIfNeeded } from "./migrateData.js";
+import { supabase } from "./supabaseClient.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
 const UPLOADS_DIR = path.join(process.cwd(), "uploads");
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, UPLOADS_DIR);
-  },
-  filename: (req, file, cb) => {
-    const uniqueFileName = `${Date.now()}_${file.originalname.replace(/\s+/g, "_")}`;
-    cb(null, uniqueFileName);
-  }
-});
+const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 // Ensure uploads directory exists
@@ -195,7 +188,7 @@ app.post("/api/lessons/:id/toggle-progress", asyncWrapper(async (req, res) => {
   if (existing) {
     existing.completed = !!completed;
     if (completed) existing.completed_at = new Date().toISOString();
-    await upsertTable("lesson_progress", [existing]);
+    await updateRowById("lesson_progress", existing.id, { completed: existing.completed, completed_at: existing.completed_at });
   } else if (completed) {
     const newProg = {
       id: "prog_" + Math.random().toString(36).substring(2, 11),
@@ -248,7 +241,7 @@ app.post("/api/admin/users/:id/toggle-block", asyncWrapper(async (req, res) => {
   if (!target) return res.status(404).json({ error: "Usuário não encontrado." });
   if (target.id === adminId) return res.status(400).json({ error: "Você não pode bloquear a si mesmo." });
   target.is_blocked = !target.is_blocked;
-  await upsertTable("users_profiles", [target]);
+  await updateRowById("users_profiles", target.id, { is_blocked: target.is_blocked });
   res.json({ success: true, user: target });
 }));
 
@@ -298,6 +291,7 @@ app.post("/api/admin/vip-offers", asyncWrapper(async (req, res) => {
   const admin = admins.find(u => u.id === adminId && u.role === "admin");
   if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
 
+  // vip_offers is a singleton row — delete and re-insert is safe here
   await upsertTable("vip_offers", [vip_offers]);
   res.json({ success: true });
 }));
@@ -314,7 +308,7 @@ app.post("/api/admin/users/:id/update", asyncWrapper(async (req, res) => {
   if (!target) return res.status(404).json({ error: "Usuário não encontrado." });
 
   Object.assign(target, updateData);
-  await upsertTable("users_profiles", [target]);
+  await updateRowById("users_profiles", target.id, updateData);
   res.json({ success: true, user: target });
 }));
 
@@ -330,7 +324,7 @@ app.post("/api/admin/users/:id/reset-password", asyncWrapper(async (req, res) =>
   if (!target) return res.status(404).json({ error: "Usuário não encontrado." });
 
   target.passwordHash = newPassword;
-  await upsertTable("users_profiles", [target]);
+  await updateRowById("users_profiles", target.id, { passwordHash: newPassword });
   res.json({ success: true });
 }));
 
@@ -370,7 +364,7 @@ app.put("/api/admin/modules/:id", asyncWrapper(async (req, res) => {
   mod.cover_image_url = cover_image_url;
   mod.is_vip = !!is_vip;
 
-  await upsertTable("modules", [mod]);
+  await updateRowById("modules", mod.id, { title: mod.title, description: mod.description, cover_image_url: mod.cover_image_url, is_vip: mod.is_vip });
   res.json({ success: true, module: mod });
 }));
 
@@ -419,27 +413,78 @@ app.delete("/api/admin/lessons/:id", asyncWrapper(async (req, res) => {
   res.json({ success: true });
 }));
 
+async function ensureBucketExists(bucketName: string) {
+  try {
+    const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+    if (listError) {
+      console.warn("Could not list Supabase buckets:", listError.message);
+      return;
+    }
+    const exists = (buckets || []).some(b => b.name === bucketName);
+    if (!exists) {
+      console.log(`Creating public bucket '${bucketName}' in Supabase...`);
+      const { error: createError } = await supabase.storage.createBucket(bucketName, {
+        public: true,
+        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif'],
+        fileSizeLimit: 10 * 1024 * 1024 // 10MB
+      });
+      if (createError) {
+        console.warn(`Could not create bucket '${bucketName}':`, createError.message);
+      } else {
+        console.log(`Bucket '${bucketName}' created successfully.`);
+      }
+    }
+  } catch (err) {
+    console.warn(`Error ensuring bucket '${bucketName}' exists:`, err);
+  }
+}
+
 app.post("/api/admin/upload-cover", upload.single('file'), asyncWrapper(async (req, res) => {
   const adminId = req.body.adminId || req.query.adminId;
   const admin = (await selectRows<any>("users_profiles")).find(u => u.id === adminId && u.role === "admin");
   if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
 
+  let fileBuffer: Buffer;
+  let fileName: string;
+  let mimeType: string;
+
   if (req.file) {
-    const publicUrl = `/uploads/${req.file.filename}`;
-    return res.json({ success: true, url: publicUrl });
+    fileBuffer = req.file.buffer;
+    fileName = req.file.originalname;
+    mimeType = req.file.mimetype;
+  } else {
+    const { fileName: bodyFileName, base64Data } = req.body;
+    if (!bodyFileName || !base64Data) {
+      return res.status(400).json({ error: "Nenhum arquivo ou dados base64 enviados." });
+    }
+    const clean = base64Data.replace(/^data:image\/\w+;base64,/, "");
+    fileBuffer = Buffer.from(clean, "base64");
+    fileName = bodyFileName;
+    const mimeMatch = base64Data.match(/^data:(image\/\w+);base64,/);
+    mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
   }
 
-  const { fileName, base64Data } = req.body;
-  if (!fileName || !base64Data) {
-    return res.status(400).json({ error: "Nenhum arquivo ou dados base64 enviados." });
-  }
-
-  const clean = base64Data.replace(/^data:image\/\w+;base64,/, "");
-  const buffer = Buffer.from(clean, "base64");
   const unique = `${Date.now()}_${fileName.replace(/\s+/g, "_")}`;
-  const dest = path.join(UPLOADS_DIR, unique);
-  fs.writeFileSync(dest, buffer);
-  return res.json({ success: true, url: `/uploads/${unique}` });
+
+  await ensureBucketExists("covers");
+
+  const { data, error } = await supabase.storage
+    .from('covers')
+    .upload(unique, fileBuffer, {
+      contentType: mimeType,
+      upsert: true
+    });
+
+  if (error) {
+    console.error("Error uploading cover to Supabase Storage:", error);
+    return res.status(500).json({ error: `Erro no upload da capa: ${error.message}` });
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from('covers')
+    .getPublicUrl(unique);
+
+  return res.json({ success: true, url: publicUrlData.publicUrl });
 }));
 
 // ---------- USER PROFILE & ACTIVITY ----------
@@ -473,7 +518,7 @@ app.post("/api/users/update-profile", asyncWrapper(async (req, res) => {
   if (email !== undefined) user.email = email;
   if (is_vip !== undefined) user.is_vip = !!is_vip;
 
-  await upsertTable("users_profiles", [user]);
+  await updateRowById("users_profiles", user.id, { name: user.name, phone: user.phone, email: user.email, is_vip: user.is_vip });
   const { passwordHash, ...safeProfile } = user;
   res.json({ success: true, user: safeProfile });
 }));
@@ -539,16 +584,33 @@ app.post("/api/users/upload-avatar", asyncWrapper(async (req, res) => {
   }
 
   const clean = base64Data.replace(/^data:image\/\w+;base64,/, "");
-  const buffer = Buffer.from(clean, "base64");
+  const fileBuffer = Buffer.from(clean, "base64");
+  const mimeMatch = base64Data.match(/^data:(image\/\w+);base64,/);
+  const mimeType = mimeMatch ? mimeMatch[1] : 'image/png';
   const unique = `avatar_${Date.now()}_${fileName.replace(/\s+/g, "_")}`;
-  const dest = path.join(UPLOADS_DIR, unique);
-  fs.writeFileSync(dest, buffer);
 
-  const publicUrl = `/uploads/${unique}`;
-  user.avatar_url = publicUrl;
-  await upsertTable("users_profiles", [user]);
+  await ensureBucketExists("avatars");
 
-  res.json({ success: true, url: publicUrl });
+  const { data, error } = await supabase.storage
+    .from('avatars')
+    .upload(unique, fileBuffer, {
+      contentType: mimeType,
+      upsert: true
+    });
+
+  if (error) {
+    console.error("Error uploading avatar to Supabase Storage:", error);
+    return res.status(500).json({ error: `Erro no upload do avatar: ${error.message}` });
+  }
+
+  const { data: publicUrlData } = supabase.storage
+    .from('avatars')
+    .getPublicUrl(unique);
+
+  user.avatar_url = publicUrlData.publicUrl;
+  await updateRowById("users_profiles", user.id, { avatar_url: user.avatar_url });
+
+  res.json({ success: true, url: user.avatar_url });
 }));
 // Start server
 app.get("/goal", (req, res) => {

@@ -29,6 +29,12 @@ export async function upsertTable<T>(table: string, rows: T[]): Promise<void> {
   await insertRows<T>(table, rows);
 }
 
+/** Update a single row by its ID (safe — does NOT delete other rows). */
+export async function updateRowById<T extends Record<string, any>>(table: string, id: string, data: Partial<T>): Promise<void> {
+  const { error } = await (supabase as any).from(table).update(data).eq('id', id);
+  if (error) throw error;
+}
+
 /** Count rows in a table. */
 export async function countRows(table: string): Promise<number> {
   const { count, error, status, statusText } = await (supabase as any).from(table).select('*', { count: 'exact', head: true });
