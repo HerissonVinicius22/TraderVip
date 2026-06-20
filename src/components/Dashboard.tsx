@@ -616,14 +616,7 @@ export default function Dashboard({ user, onLogout, onOpenAdmin }: DashboardProp
                       </button>
                     )}
                     
-                    <a
-                      href="https://tradingview.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 sm:flex-none border border-zinc-800 hover:bg-zinc-900 text-zinc-300 hover:text-white font-semibold text-xs px-5 py-4 rounded flex items-center justify-center gap-2 transition"
-                    >
-                      Abrir Gráfico Auxiliar <ExternalLink className="h-3.5 w-3.5" />
-                    </a>
+                    
                   </div>
                 </div>
 
