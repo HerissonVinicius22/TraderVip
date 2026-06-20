@@ -368,6 +368,42 @@ app.put("/api/admin/modules/:id", asyncWrapper(async (req, res) => {
   res.json({ success: true, module: mod });
 }));
 
+function convertToYoutubeEmbedUrl(url: string): string {
+  if (!url) return "";
+  
+  const trimmed = url.trim();
+  if (trimmed.includes("youtube.com/embed/")) {
+    return trimmed;
+  }
+  
+  let videoId = "";
+  
+  if (trimmed.includes("v=")) {
+    const parts = trimmed.split("v=");
+    if (parts[1]) {
+      videoId = parts[1].split("&")[0];
+    }
+  } else if (trimmed.includes("youtu.be/")) {
+    const parts = trimmed.split("youtu.be/");
+    if (parts[1]) {
+      videoId = parts[1].split("?")[0].split("/")[0];
+    }
+  } else if (trimmed.includes("/shorts/")) {
+    const parts = trimmed.split("/shorts/");
+    if (parts[1]) {
+      videoId = parts[1].split("?")[0].split("/")[0];
+    }
+  } else if (trimmed.length === 11 && !trimmed.includes("/") && !trimmed.includes(".")) {
+    videoId = trimmed;
+  }
+  
+  if (videoId) {
+    return `https://www.youtube.com/embed/${videoId}`;
+  }
+  
+  return trimmed;
+}
+
 app.post("/api/admin/lessons", asyncWrapper(async (req, res) => {
   const { adminId, module_id, title, youtube_url, duration } = req.body;
   const admins = await selectRows<any>("users_profiles");
@@ -378,11 +414,13 @@ app.post("/api/admin/lessons", asyncWrapper(async (req, res) => {
   const modLessons = lessons.filter(l => l.module_id === module_id);
   const nextOrder = modLessons.length > 0 ? Math.max(...modLessons.map(l => l.order_index)) + 1 : 1;
 
+  const formattedUrl = convertToYoutubeEmbedUrl(youtube_url);
+
   const newLesson = {
     id: "les_" + Math.random().toString(36).substring(2, 11),
     module_id,
     title,
-    youtube_url,
+    youtube_url: formattedUrl,
     duration,
     order_index: nextOrder
   };
