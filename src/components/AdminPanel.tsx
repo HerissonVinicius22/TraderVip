@@ -76,6 +76,7 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
   const [lesTitle, setLesTitle] = useState("");
   const [lesYoutubeUrl, setLesYoutubeUrl] = useState("");
   const [lesDuration, setLesDuration] = useState("");
+  const [lesDesc, setLesDesc] = useState("");
 
   // Edit student inputs
   const [editName, setEditName] = useState("");
@@ -387,7 +388,8 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
           module_id: lesModId,
           title: lesTitle,
           youtube_url: lesYoutubeUrl,
-          duration: lesDuration || "10:00"
+          duration: lesDuration || "10:00",
+          description: lesDesc
         })
       });
       const data = await res.json();
@@ -398,6 +400,7 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
         setLesTitle("");
         setLesYoutubeUrl("");
         setLesDuration("");
+        setLesDesc("");
         loadAllAdminData();
       } else {
         alert(data.error);
@@ -732,6 +735,7 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
                       setLesTitle("");
                       setLesYoutubeUrl("");
                       setLesDuration("");
+                      setLesDesc("");
                       setShowLessonModal(true);
                     }}
                     className="flex-1 sm:flex-none bg-zinc-900 hover:bg-zinc-800 text-white border border-zinc-800 font-bold text-xs px-4 py-3 rounded flex items-center justify-center gap-1.5 active:scale-95 transition cursor-pointer"
@@ -815,6 +819,7 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
                                 setLesTitle(les.title);
                                 setLesYoutubeUrl(les.youtube_url);
                                 setLesDuration(les.duration || "");
+                                setLesDesc(les.description || "");
                                 setShowLessonModal(true);
                               }}
                               className="p-1 px-2 bg-zinc-900 border border-zinc-800 hover:bg-amber-500/10 text-zinc-500 hover:text-amber-500 rounded transition"
@@ -1284,6 +1289,16 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
                   className="w-full bg-zinc-950 border border-zinc-850 focus:border-amber-500/60 p-3 rounded text-sm text-white focus:outline-none"
                 />
               </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-300 block">Descrição da Aula (e Links de Direcionamento)</label>
+                <textarea
+                  placeholder="Descreva o conteúdo desta aula ou adicione links úteis (Ex: https://google.com)..."
+                  value={lesDesc}
+                  onChange={(e) => setLesDesc(e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-850 focus:border-amber-500/60 p-3 rounded text-sm text-white h-24 focus:outline-none resize-none"
+                />
+              </div>
             </div>
 
             <div className="flex gap-2 pt-4">
@@ -1295,6 +1310,7 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
                   setLesTitle("");
                   setLesYoutubeUrl("");
                   setLesDuration("");
+                  setLesDesc("");
                 }}
                 className="flex-1 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-xs py-3.5 rounded transition"
               >

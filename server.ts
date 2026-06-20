@@ -405,7 +405,7 @@ function convertToYoutubeEmbedUrl(url: string): string {
 }
 
 app.post("/api/admin/lessons", asyncWrapper(async (req, res) => {
-  const { adminId, module_id, title, youtube_url, duration } = req.body;
+  const { adminId, module_id, title, youtube_url, duration, description } = req.body;
   const admins = await selectRows<any>("users_profiles");
   const admin = admins.find(u => u.id === adminId && u.role === "admin");
   if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
@@ -422,6 +422,7 @@ app.post("/api/admin/lessons", asyncWrapper(async (req, res) => {
     title,
     youtube_url: formattedUrl,
     duration,
+    description: description || "",
     order_index: nextOrder
   };
   await insertRows("lessons", [newLesson]);
@@ -429,7 +430,7 @@ app.post("/api/admin/lessons", asyncWrapper(async (req, res) => {
 }));
 
 app.put("/api/admin/lessons/:id", asyncWrapper(async (req, res) => {
-  const { adminId, module_id, title, youtube_url, duration } = req.body;
+  const { adminId, module_id, title, youtube_url, duration, description } = req.body;
   const lessonId = req.params.id;
   const admins = await selectRows<any>("users_profiles");
   const admin = admins.find(u => u.id === adminId && u.role === "admin");
@@ -444,13 +445,15 @@ app.put("/api/admin/lessons/:id", asyncWrapper(async (req, res) => {
   lesson.title = title || lesson.title;
   lesson.youtube_url = formattedUrl || lesson.youtube_url;
   lesson.duration = duration || lesson.duration;
+  if (description !== undefined) lesson.description = description;
   if (module_id) lesson.module_id = module_id;
 
   await updateRowById("lessons", lesson.id, {
     title: lesson.title,
     youtube_url: lesson.youtube_url,
     duration: lesson.duration,
-    module_id: lesson.module_id
+    module_id: lesson.module_id,
+    description: lesson.description
   });
 
   res.json({ success: true, lesson });

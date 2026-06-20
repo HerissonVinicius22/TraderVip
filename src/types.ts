@@ -26,6 +26,7 @@ export interface Lesson {
   title: string;
   youtube_url: string;
   duration: string; // e.g. "12:30"
+  description?: string;
   order_index: number;
 }
 

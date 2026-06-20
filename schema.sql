@@ -33,6 +33,7 @@ CREATE TABLE lessons (
   title TEXT,
   youtube_url TEXT,
   duration TEXT,
+  description TEXT,
   order_index INTEGER
 );
 

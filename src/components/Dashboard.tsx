@@ -57,6 +57,40 @@ function convertToYoutubeEmbedUrl(url: string): string {
   return trimmed;
 }
 
+function renderDescriptionWithLinks(text?: string) {
+  if (!text) {
+    return (
+      <p className="text-xs text-zinc-400 leading-relaxed">
+        Você pode pausar e reassistir essa mentoria quantas vezes desejar. Mantenha seu diário de trading ao lado para anotar as zonas operacionais ensinadas neste capítulo.
+      </p>
+    );
+  }
+
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  
+  return (
+    <p className="text-xs text-zinc-400 leading-relaxed whitespace-pre-wrap">
+      {parts.map((part, index) => {
+        if (urlRegex.test(part)) {
+          return (
+            <a 
+              key={index} 
+              href={part} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="text-amber-500 hover:text-amber-400 underline font-bold transition break-all"
+            >
+              {part}
+            </a>
+          );
+        }
+        return part;
+      })}
+    </p>
+  );
+}
+
 export default function Dashboard({ user, onLogout, onOpenAdmin }: DashboardProps) {
   const [currentUser, setCurrentUser] = useState<UserProfile>(user);
   const [modules, setModules] = useState<Module[]>([]);
@@ -561,9 +595,7 @@ export default function Dashboard({ user, onLogout, onOpenAdmin }: DashboardProp
                     )}
                   </div>
 
-                  <p className="text-xs text-zinc-400 leading-relaxed">
-                    Você pode pausar e reassistir essa mentoria quantas vezes desejar. Mantenha seu diário de trading ao lado para anotar as zonas operacionais ensinadas neste capítulo.
-                  </p>
+                  {renderDescriptionWithLinks(activeLesson.description)}
 
                   <div className="pt-2 flex flex-col sm:flex-row gap-3">
                     {progress[activeLesson.id] ? (
