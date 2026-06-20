@@ -21,10 +21,40 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { UserProfile, Module, Lesson, VipOffers } from "../types";
 
-interface DashboardProps {
-  user: UserProfile;
-  onLogout: () => void;
-  onOpenAdmin: () => void;
+function convertToYoutubeEmbedUrl(url: string): string {
+  if (!url) return "";
+  
+  const trimmed = url.trim();
+  if (trimmed.includes("youtube.com/embed/")) {
+    return trimmed;
+  }
+  
+  let videoId = "";
+  
+  if (trimmed.includes("v=")) {
+    const parts = trimmed.split("v=");
+    if (parts[1]) {
+      videoId = parts[1].split("&")[0];
+    }
+  } else if (trimmed.includes("youtu.be/")) {
+    const parts = trimmed.split("youtu.be/");
+    if (parts[1]) {
+      videoId = parts[1].split("?")[0].split("/")[0];
+    }
+  } else if (trimmed.includes("/shorts/")) {
+    const parts = trimmed.split("/shorts/");
+    if (parts[1]) {
+      videoId = parts[1].split("?")[0].split("/")[0];
+    }
+  } else if (trimmed.length === 11 && !trimmed.includes("/") && !trimmed.includes(".")) {
+    videoId = trimmed;
+  }
+  
+  if (videoId) {
+    return `https://www.youtube.com/embed/${videoId}`;
+  }
+  
+  return trimmed;
 }
 
 export default function Dashboard({ user, onLogout, onOpenAdmin }: DashboardProps) {
@@ -501,7 +531,7 @@ export default function Dashboard({ user, onLogout, onOpenAdmin }: DashboardProp
                 <div className="lg:col-span-7">
                   <div className="relative aspect-video bg-black rounded-xl overflow-hidden shadow-2xl border border-zinc-800 ring-4 ring-black/40">
                     <iframe
-                      src={activeLesson.youtube_url}
+                      src={convertToYoutubeEmbedUrl(activeLesson.youtube_url)}
                       title={activeLesson.title}
                       className="absolute inset-0 w-full h-full"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
