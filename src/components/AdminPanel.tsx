@@ -71,6 +71,7 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
 
   // Lesson addition form inputs
   const [showLessonModal, setShowLessonModal] = useState(false);
+  const [lesEditingId, setLesEditingId] = useState<string | null>(null);
   const [lesModId, setLesModId] = useState("");
   const [lesTitle, setLesTitle] = useState("");
   const [lesYoutubeUrl, setLesYoutubeUrl] = useState("");
@@ -375,8 +376,11 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
     if (!lesTitle || !lesYoutubeUrl || !lesModId) return;
 
     try {
-      const res = await fetch("/api/admin/lessons", {
-        method: "POST",
+      const url = lesEditingId ? `/api/admin/lessons/${lesEditingId}` : "/api/admin/lessons";
+      const method = lesEditingId ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           adminId: adminUser.id,
@@ -388,8 +392,9 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
       });
       const data = await res.json();
       if (res.ok) {
-        flashMessage("Aula inserida com sucesso!");
+        flashMessage(lesEditingId ? "Aula editada com sucesso!" : "Aula inserida com sucesso!");
         setShowLessonModal(false);
+        setLesEditingId(null);
         setLesTitle("");
         setLesYoutubeUrl("");
         setLesDuration("");
@@ -723,6 +728,7 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
                         return;
                       }
                       setLesModId(modules[0].id);
+                      setLesEditingId(null);
                       setLesTitle("");
                       setLesYoutubeUrl("");
                       setLesDuration("");
@@ -802,6 +808,20 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
                             <span className="text-[11px] text-zinc-400 font-mono flex items-center gap-1">
                               <Clock className="h-3.5 w-3.5 text-zinc-500" /> {les.duration}
                             </span>
+                            <button
+                              onClick={() => {
+                                setLesEditingId(les.id);
+                                setLesModId(mod.id);
+                                setLesTitle(les.title);
+                                setLesYoutubeUrl(les.youtube_url);
+                                setLesDuration(les.duration || "");
+                                setShowLessonModal(true);
+                              }}
+                              className="p-1 px-2 bg-zinc-900 border border-zinc-800 hover:bg-amber-500/10 text-zinc-500 hover:text-amber-500 rounded transition"
+                              title="Editar Aula"
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </button>
                             <button
                               onClick={() => handleDeleteLesson(les.id)}
                               className="p-1 px-2 bg-zinc-900 border border-zinc-800 hover:bg-red-500/10 text-zinc-500 hover:text-red-500 rounded transition"
@@ -1205,12 +1225,12 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
         </div>
       )}
 
-      {/* MODAL 4: INSERT LESSON */}
+      {/* MODAL 4: INSERT/EDIT LESSON */}
       {showLessonModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
           <form onSubmit={handleSaveLesson} className="bg-zinc-900 border border-zinc-800 max-w-md w-full rounded-2xl p-6 md:p-8 space-y-4">
             <h3 className="text-lg font-bold text-white flex items-center gap-1.5">
-              Inserir Aula na Temporada <Youtube className="h-4 w-4 text-amber-500" />
+              {lesEditingId ? "Editar Aula na Temporada" : "Inserir Aula na Temporada"} <Youtube className="h-4 w-4 text-amber-500" />
             </h3>
             <p className="text-xs text-zinc-400">
               O link do YouTube será automaticamente convertido em player para reprodução nas aulas livres.
@@ -1269,7 +1289,13 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
             <div className="flex gap-2 pt-4">
               <button
                 type="button"
-                onClick={() => setShowLessonModal(false)}
+                onClick={() => {
+                  setShowLessonModal(false);
+                  setLesEditingId(null);
+                  setLesTitle("");
+                  setLesYoutubeUrl("");
+                  setLesDuration("");
+                }}
                 className="flex-1 bg-zinc-950 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-xs py-3.5 rounded transition"
               >
                 Voltar
@@ -1278,7 +1304,7 @@ export default function AdminPanel({ adminUser, onCloseAdmin }: AdminPanelProps)
                 type="submit"
                 className="flex-1 bg-amber-500 hover:bg-amber-600 text-black font-bold text-xs py-3.5 rounded transition"
               >
-                Vincular Aula
+                {lesEditingId ? "Salvar Alterações" : "Vincular Aula"}
               </button>
             </div>
           </form>

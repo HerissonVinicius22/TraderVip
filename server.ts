@@ -428,6 +428,34 @@ app.post("/api/admin/lessons", asyncWrapper(async (req, res) => {
   res.json({ success: true, lesson: newLesson });
 }));
 
+app.put("/api/admin/lessons/:id", asyncWrapper(async (req, res) => {
+  const { adminId, module_id, title, youtube_url, duration } = req.body;
+  const lessonId = req.params.id;
+  const admins = await selectRows<any>("users_profiles");
+  const admin = admins.find(u => u.id === adminId && u.role === "admin");
+  if (!admin) return res.status(403).json({ error: "Acesso administrativo negado." });
+
+  const lessons = await selectRows<any>("lessons");
+  const lesson = lessons.find(l => l.id === lessonId);
+  if (!lesson) return res.status(404).json({ error: "Aula não encontrada." });
+
+  const formattedUrl = convertToYoutubeEmbedUrl(youtube_url);
+
+  lesson.title = title || lesson.title;
+  lesson.youtube_url = formattedUrl || lesson.youtube_url;
+  lesson.duration = duration || lesson.duration;
+  if (module_id) lesson.module_id = module_id;
+
+  await updateRowById("lessons", lesson.id, {
+    title: lesson.title,
+    youtube_url: lesson.youtube_url,
+    duration: lesson.duration,
+    module_id: lesson.module_id
+  });
+
+  res.json({ success: true, lesson });
+}));
+
 app.delete("/api/admin/modules/:id", asyncWrapper(async (req, res) => {
   const adminId = req.query.adminId as string;
   const moduleId = req.params.id;
