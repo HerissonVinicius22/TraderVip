@@ -532,7 +532,7 @@ export default function Dashboard({ user, onLogout, onOpenAdmin }: DashboardProp
                 </div>
               ) : (
                 <div className="w-8 h-8 rounded bg-amber-500 flex items-center justify-center font-bold text-black text-xs uppercase shrink-0 shadow-inner">
-                  {currentUser.name.substring(0, 2)}
+                  {(currentUser.name || "User").substring(0, 2)}
                 </div>
               )}
             </div>

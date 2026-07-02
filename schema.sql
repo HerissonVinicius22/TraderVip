@@ -3,6 +3,7 @@ DROP TABLE IF EXISTS terms_acceptance CASCADE;
 DROP TABLE IF EXISTS lesson_progress CASCADE;
 DROP TABLE IF EXISTS lessons CASCADE;
 DROP TABLE IF EXISTS modules CASCADE;
+DROP TABLE IF EXISTS user_activities CASCADE;
 DROP TABLE IF EXISTS users_profiles CASCADE;
 
 CREATE TABLE users_profiles (
@@ -62,4 +63,10 @@ CREATE TABLE vip_offers (
   lifetime_price TEXT,
   lifetime_installment_value TEXT,
   lifetime_checkout_url TEXT
+);
+
+CREATE TABLE user_activities (
+  id TEXT PRIMARY KEY REFERENCES users_profiles(id) ON DELETE CASCADE,
+  favorites JSONB DEFAULT '[]'::jsonb,
+  recents JSONB DEFAULT '[]'::jsonb
 );

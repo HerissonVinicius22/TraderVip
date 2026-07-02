@@ -27,24 +27,7 @@ try {
 app.use(express.json({ limit: "50mb" })); // High limit for Base64 uploads
 app.use("/uploads", express.static(UPLOADS_DIR));
 
-// User Activities In-Memory Persistence with JSON file backup
-const ACTIVITY_FILE = path.join(process.cwd(), "user_activity.json");
-let userActivities: Record<string, { favorites: string[], recents: string[] }> = {};
-try {
-  if (fs.existsSync(ACTIVITY_FILE)) {
-    userActivities = JSON.parse(fs.readFileSync(ACTIVITY_FILE, "utf8"));
-  }
-} catch (e) {
-  console.warn("Could not read user_activity.json");
-}
-
-function saveActivities() {
-  try {
-    fs.writeFileSync(ACTIVITY_FILE, JSON.stringify(userActivities, null, 2), "utf8");
-  } catch (e) {
-    console.warn("Could not save user_activity.json");
-  }
-}
+// userActivities memory logic removed (migrated to Supabase)
 
 // Simple logger
 process.on('unhandledRejection', (reason, promise) => {
@@ -594,10 +577,12 @@ app.post("/api/users/update-profile", asyncWrapper(async (req, res) => {
 
 app.get("/api/users/:id/activity", asyncWrapper(async (req, res) => {
   const userId = req.params.id;
-  if (!userActivities[userId]) {
-    userActivities[userId] = { favorites: [], recents: [] };
+  const rows = await selectRows<any>("user_activities");
+  let activity = rows.find(r => r.id === userId);
+  if (!activity) {
+    activity = { id: userId, favorites: [], recents: [] };
   }
-  res.json(userActivities[userId]);
+  res.json(activity);
 }));
 
 app.post("/api/users/toggle-favorite", asyncWrapper(async (req, res) => {
@@ -605,17 +590,28 @@ app.post("/api/users/toggle-favorite", asyncWrapper(async (req, res) => {
   if (!userId || !lessonId) {
     return res.status(400).json({ error: "userId e lessonId são obrigatórios." });
   }
-  if (!userActivities[userId]) {
-    userActivities[userId] = { favorites: [], recents: [] };
+  const rows = await selectRows<any>("user_activities");
+  let activity = rows.find(r => r.id === userId);
+  let isNew = false;
+  if (!activity) {
+    activity = { id: userId, favorites: [], recents: [] };
+    isNew = true;
   }
-  const favs = userActivities[userId].favorites;
+  
+  const favs = activity.favorites || [];
   const index = favs.indexOf(lessonId);
   if (index > -1) {
     favs.splice(index, 1);
   } else {
     favs.push(lessonId);
   }
-  saveActivities();
+  activity.favorites = favs;
+
+  if (isNew) {
+    await insertRows("user_activities", [activity]);
+  } else {
+    await updateRowById("user_activities", userId, { favorites: favs });
+  }
   res.json({ success: true, favorites: favs });
 }));
 
@@ -624,10 +620,15 @@ app.post("/api/users/add-recent", asyncWrapper(async (req, res) => {
   if (!userId || !lessonId) {
     return res.status(400).json({ error: "userId e lessonId são obrigatórios." });
   }
-  if (!userActivities[userId]) {
-    userActivities[userId] = { favorites: [], recents: [] };
+  const rows = await selectRows<any>("user_activities");
+  let activity = rows.find(r => r.id === userId);
+  let isNew = false;
+  if (!activity) {
+    activity = { id: userId, favorites: [], recents: [] };
+    isNew = true;
   }
-  const recs = userActivities[userId].recents;
+  
+  const recs = activity.recents || [];
   const index = recs.indexOf(lessonId);
   if (index > -1) {
     recs.splice(index, 1);
@@ -636,7 +637,13 @@ app.post("/api/users/add-recent", asyncWrapper(async (req, res) => {
   if (recs.length > 10) {
     recs.shift();
   }
-  saveActivities();
+  activity.recents = recs;
+
+  if (isNew) {
+    await insertRows("user_activities", [activity]);
+  } else {
+    await updateRowById("user_activities", userId, { recents: recs });
+  }
   res.json({ success: true, recents: recs });
 }));
 
